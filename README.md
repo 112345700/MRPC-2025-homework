@@ -1,3 +1,12 @@
+## 维护日志
+
+- **2025.11.22**：课程作业正式发布。
+- **2025.11.25**：修正了 `calculate_results.py` 的评价指标问题。
+- **2025.12.02**：对 `calculate_results.py` 进行了一些修改，并更新了部分文档中的路径错误和修正了模糊的表述。
+- **2025.12.02**：调整了 `calculate_results.py` 的碰撞权重参数，并修复了 `trajectory_generator_node.cpp` 中 `issafe` 函数无法正确保存数据的 bug。
+- **2025.12.18**：删除了 `code/README.md` 的 `3.1 步骤 4: 测试移动`。
+
+
 ## 统一评分细则
 
 - 完成 `documents/homework.pdf` 中的题目 1 和题目 2，可获得 **30 分**。
@@ -25,12 +34,13 @@
   - 共享代码或参考他人代码实现。
 
 ## 提交方式
-
+- 完成之后请运行`bash check_completeness.sh`检查提交的完整性。
 - 把最终文件夹 `MRPC-2025-homework/` 压缩为 zip，命名为 `姓名-学号.zip`（如 `张三-23123456.zip`），发送到 `SYSU_HILAB_Course@163.com`。
 - 报告务必导出为 PDF，文件名固定为 `report.pdf`，放在仓库根目录下的 `solutions` 文件夹内。
 - 在 `solutions` 目录下同时保留以下文件：
   - `report.pdf`（必须）
   - `video.mp4`（任务三飞行视频，必须）
+  - `result.txt` (任务三运行`calculate_results.py`后生成的txt文件，必须)
   - `df_quaternion.csv`（若选做 `documents/homework.pdf` 题目 3）
 - 仓库内的 `code` 部分需要同步更新，保证所有脚本与包能按 `code/README.md` 中的要求顺利运行。
 - 如果选做 `documents/homework.pdf` 题目 3，则还需要包含 `quadrotor_df` 的 ROS 可执行包。
