@@ -174,7 +174,6 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
     // AOA[i] = alpha0 - atan2(motor_linear_velocity[i], blade_linear_velocity[i]) * 180 / 3.14159265;
   }
 
-  // ============== 关键变量定义 (必须保留) ==============
   double thrust = kf_ * motor_rpm_sq.sum();  // 总推力
 
   Eigen::Vector3d moments;
@@ -192,11 +191,11 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
   {
     vnorm.normalize();
   }
-  // ====================================================
+  
 
   x_dot = cur_state.v;
 
-  // ==================== 补全部分开始 ====================
+  
   // 1. 线运动方程: m*a = G + R*T + F_drag + F_ext
   Eigen::Vector3d gravity(0, 0, -g_);                // 重力向量 (世界系)
   Eigen::Vector3d thrust_vec_body(0, 0, thrust);     // 推力向量 (机体系)
@@ -210,7 +209,7 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
   v_dot = total_force / mass_;
   acc_ = v_dot;
 
-  // 2. 姿态运动学
+  
   R_dot = R * omega_vee;
 
   // 3. 角运动方程: J*w_dot + w x (J*w) = Tau
@@ -219,7 +218,7 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
   Eigen::Vector3d coriolis_term = cur_state.omega.cross(J_ * cur_state.omega); // 陀螺力矩项
 
   omega_dot = J_.inverse() * (total_torque - coriolis_term);
-  // ==================== 补全部分结束 ====================
+  
 
   motor_rpm_dot = (input_ - cur_state.motor_rpm) / motor_time_constant_;
 
