@@ -225,11 +225,10 @@ main(int argc, char** argv)
   sensor_msgs::Imu imu;
   imu.header.frame_id = "/simulator";
 
-  /*
   command.force[0] = 0;
   command.force[1] = 0;
-  command.force[2] = quad.getMass()*quad.getGravity() + 0.1;
-  command.qx = 0;
+  command.force[2] = quad.getMass() * quad.getGravity() + 5.0; // 强制上升
+  /*command.qx = 0;
   command.qy = 0;
   command.qz = 0;
   command.qw = 1;
@@ -239,8 +238,7 @@ main(int argc, char** argv)
   command.kOm[0] = 0.15;
   command.kOm[1] = 0.15;
   command.kOm[2] = 0.15;
-  */
-
+*/
   ros::Time next_odom_pub_time = ros::Time::now();
   while (n.ok())
   {

@@ -1,64 +1,144 @@
-#ifndef _ASTART_SEARCHER_H
-#define _ASTART_SEARCHER_H
+#pragma once
 
-#include <iostream>
 #include <ros/ros.h>
-#include <ros/console.h>
 #include <Eigen/Eigen>
-#include "backward.hpp"
-#include "node.h"
+#include <vector>
+#include <queue>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <cmath>
 
-class Astarpath
-{	
-	private:
+class MappingNode;
+typedef MappingNode* MappingNodePtr;
 
-	protected:
-		uint8_t * data;
-		MappingNodePtr *** Map_Node;
-		Eigen::Vector3i goalIdx;
-		int GRID_X_SIZE, GRID_Y_SIZE, GRID_Z_SIZE;
-		int GLXYZ_SIZE, GLYZ_SIZE;
+class MappingNode {
+public:
+  Eigen::Vector3i index;
+  Eigen::Vector3d coord;
 
-		double resolution, inv_resolution;
-		double gl_xl, gl_yl, gl_zl;
-		double gl_xu, gl_yu, gl_zu;
+  // A* states: 0 = unvisited, 1 = in open, -1 = in closed
+  int id = 0;
+  double g_score = std::numeric_limits<double>::infinity(); // meters
+  double f_score = std::numeric_limits<double>::infinity(); // meters
+  MappingNodePtr Father = nullptr;
 
-		MappingNodePtr terminatePtr;
-		std::multimap<double, MappingNodePtr> Openset;
-
-		double getHeu(MappingNodePtr node1, MappingNodePtr node2);
-		void AstarGetSucc(MappingNodePtr currentPtr, std::vector<MappingNodePtr> & neighborPtrSets, std::vector<double> & edgeCostSets);		
-		Eigen::Vector3d gridIndex2coord(const Eigen::Vector3i & index);
-		Eigen::Vector3i coord2gridIndex(const Eigen::Vector3d & pt);
-		bool isOccupied(const int & idx_x, const int & idx_y, const int & idx_z) const;
-		bool isOccupied(const Eigen::Vector3i & index) const;
-		bool isFree(const int & idx_x, const int & idx_y, const int & idx_z) const;
-		bool isFree(const Eigen::Vector3i & index) const;
-    	
-		
-		
-
-	public:
-		Astarpath(){};
-		~Astarpath(){};
-		bool AstarSearch(Eigen::Vector3d start_pt, Eigen::Vector3d end_pt);
-		void resetGrid(MappingNodePtr ptr);
-		void resetUsedGrids();
-		bool is_occupy(const Eigen::Vector3i & index);
-		Eigen::Vector3i c2i(const Eigen::Vector3d & pt);
-
-		void begin_grid_map(double _resolution, Eigen::Vector3d global_xyz_l, Eigen::Vector3d global_xyz_u, int max_x_id, int max_y_id, int max_z_id);
-		void set_barrier(const double coord_x, const double coord_y, const double coord_z);
-
-		Eigen::Vector3d coordRounding(const Eigen::Vector3d & coord);
-		std::vector<Eigen::Vector3d> getPath();
-		std::vector<Eigen::Vector3d> getVisitedNodes();
-		std::vector<Eigen::Vector3d> pathSimplify(const std::vector<Eigen::Vector3d> &path, const double path_resolution);
-		Eigen::Vector3d getPosPoly( Eigen::MatrixXd polyCoeff, int k, double t );
-		int safeCheck( Eigen::MatrixXd polyCoeff, Eigen::VectorXd time);
-		double perpendicularDistance(const Eigen::Vector3d point_insert,const Eigen::Vector3d point_st,const Eigen::Vector3d point_end);
-        void resetOccupy();
+  MappingNode(const Eigen::Vector3i& idx, const Eigen::Vector3d& pos)
+      : index(idx), coord(pos) {}
 };
 
+class Astarpath {
+public:
+  Astarpath() = default;
+  ~Astarpath();
 
-#endif
+  void begin_grid_map(double _resolution,
+                      Eigen::Vector3d global_xyz_l,
+                      Eigen::Vector3d global_xyz_u,
+                      int max_x_id, int max_y_id, int max_z_id);
+
+  void resetOccupy();
+  void set_barrier(double coord_x, double coord_y, double coord_z, int inflation_r = 1);
+
+  bool AstarSearch(Eigen::Vector3d start_pt, Eigen::Vector3d end_pt);
+
+  std::vector<Eigen::Vector3d> getPath();
+  std::vector<Eigen::Vector3d> getVisitedNodes();
+  void resetUsedGrids();
+
+  // optional: simplify
+  std::vector<Eigen::Vector3d> pathSimplify(const std::vector<Eigen::Vector3d> &path,
+                                            double path_resolution);
+  double perpendicularDistance(const Eigen::Vector3d point_insert,
+                               const Eigen::Vector3d point_st,
+                               const Eigen::Vector3d point_end);
+
+  // poly related (kept from your code)
+  Eigen::Vector3d getPosPoly(Eigen::MatrixXd polyCoeff, int k, double t);
+  int safeCheck(Eigen::MatrixXd polyCoeff, Eigen::VectorXd time);
+
+  // coordinate helpers
+  Eigen::Vector3d gridIndex2coord(const Eigen::Vector3i &index);
+  Eigen::Vector3i coord2gridIndex(const Eigen::Vector3d &pt);
+  Eigen::Vector3i c2i(const Eigen::Vector3d &pt);
+  Eigen::Vector3d coordRounding(const Eigen::Vector3d &coord);
+
+  // occupancy queries
+  bool is_occupy(const Eigen::Vector3i &index);
+  inline bool isOccupied(const Eigen::Vector3i &idx) const;
+  inline bool isOccupiedRaw(const Eigen::Vector3i &idx) const;
+
+  //inline bool isOccupied(const Eigen::Vector3i &index) const;
+  //inline bool isFree(const Eigen::Vector3i &index) const;
+
+private:
+  // map bounds
+  double gl_xl = 0, gl_yl = 0, gl_zl = 0;
+  double gl_xu = 0, gl_yu = 0, gl_zu = 0;
+
+  // grid
+  int GRID_X_SIZE = 0, GRID_Y_SIZE = 0, GRID_Z_SIZE = 0;
+  int GLYZ_SIZE = 0, GLXYZ_SIZE = 0;
+
+  // resolution
+  double resolution = 1.0;
+  double inv_resolution = 1.0;
+  
+
+  // occupancy data
+  uint8_t* data_raw = nullptr;   // 真实障碍：给 issafe / safeCheck
+  uint8_t* data_plan = nullptr;  // 规划障碍：给 A*
+
+
+  // nodes
+  MappingNodePtr*** Map_Node = nullptr;
+
+  // goal
+  Eigen::Vector3i goalIdx;
+  MappingNodePtr terminatePtr = nullptr;
+
+  // for fast reset
+  std::vector<MappingNodePtr> used_nodes;
+
+  // --- A* open set (priority queue) ---
+  struct OpenEntry {
+    double f;
+    MappingNodePtr node;
+  };
+  struct OpenCmp {
+    bool operator()(const OpenEntry& a, const OpenEntry& b) const {
+      // min-heap behavior with priority_queue by reversing
+      return a.f > b.f;
+    }
+  };
+  std::priority_queue<OpenEntry, std::vector<OpenEntry>, OpenCmp> open_pq;
+
+private:
+  void resetGrid(MappingNodePtr ptr);
+  
+
+  bool isOccupied(int idx_x, int idx_y, int idx_z) const;
+  //inline bool isFree(int idx_x, int idx_y, int idx_z) const;
+  double obstacleProximityCost(const Eigen::Vector3i& idx) const;
+  bool verticalCorridorFree(const Eigen::Vector3i& xy_idx, int z_from, int z_to) const;
+  bool isOccupiedRaw(const int &idx_x, const int &idx_y, const int &idx_z) const;
+
+
+
+
+  // successors
+  void AstarGetSucc(MappingNodePtr currentPtr,
+                    std::vector<MappingNodePtr> &neighborPtrSets,
+                    std::vector<double> &edgeCostSets);
+
+  // real heuristic in meters
+  double getHeu(MappingNodePtr node1, MappingNodePtr node2);
+
+  // optional: prevent corner-cutting in 26-neighborhood
+  bool validMove(const Eigen::Vector3i& from, const Eigen::Vector3i& to) const;
+
+  inline void touchNode(MappingNodePtr n) {
+    if (n->id == 0) used_nodes.push_back(n);
+  }
+};
+

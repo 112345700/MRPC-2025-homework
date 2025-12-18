@@ -100,8 +100,8 @@ SO3ControlNodelet::position_cmd_callback(
   des_acc_ = Eigen::Vector3d(cmd->acceleration.x, cmd->acceleration.y,
                              cmd->acceleration.z);
 
-  kx_ = Eigen::Vector3d(15.7, 8.7, 6.0);
-  kv_ = Eigen::Vector3d(6.4, 13.4, 4.0);
+  kx_ = Eigen::Vector3d(8, 8.7, 8.0);
+  kv_ = Eigen::Vector3d(4, 4, 4.0);
 
   des_yaw_              = cmd->yaw;
   des_yaw_dot_          = cmd->yaw_dot;
@@ -216,3 +216,4 @@ SO3ControlNodelet::onInit(void)
 
 #include <pluginlib/class_list_macros.h>
 PLUGINLIB_EXPORT_CLASS(SO3ControlNodelet, nodelet::Nodelet);
+

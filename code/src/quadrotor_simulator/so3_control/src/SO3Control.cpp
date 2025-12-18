@@ -131,3 +131,4 @@ SO3Control::setAcc(const Eigen::Vector3d& acc)
 {
   acc_ = acc;
 }
+

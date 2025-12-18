@@ -129,7 +129,7 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
                       Quadrotor::InternalState& dxdt, const double /* t */)
 {
   State cur_state;
-  for (int i = 0; i < 3; i++)    //状态提取
+  for (int i = 0; i < 3; i++)
   {
     cur_state.x(i) = x[0 + i];
     cur_state.v(i) = x[3 + i];
@@ -143,68 +143,83 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
     cur_state.motor_rpm(i) = x[18 + i];
   }
 
-
-  // 姿态矩阵处理（重新正交化）
+  // 1. 姿态矩阵正交化
   Eigen::LLT<Eigen::Matrix3d> llt(cur_state.R.transpose() * cur_state.R);
   Eigen::Matrix3d             P = llt.matrixL();
   Eigen::Matrix3d             R = cur_state.R * P.inverse();
 
-  //中间变量定义和计算,定义了一系列用于后续计算的中间变量。
-  Eigen::Vector3d x_dot, v_dot, omega_dot;  //分别用于存储位置、速度和角速度的导数
-  Eigen::Matrix3d R_dot;                    //用于存储姿态矩阵的导数
-  Eigen::Array4d  motor_rpm_dot;            //用于存储电机转速的导数
-  Eigen::Vector3d vnorm;                    //用于存储速度的单位向量
-  Eigen::Array4d  motor_rpm_sq;             //用于存储电机转速的平方
-  Eigen::Matrix3d omega_vee(Eigen::Matrix3d::Zero());    //角速度的反对称矩阵
+  Eigen::Vector3d x_dot, v_dot, omega_dot;
+  Eigen::Matrix3d R_dot;
+  Eigen::Array4d  motor_rpm_dot;
+  Eigen::Vector3d vnorm;
+  Eigen::Array4d  motor_rpm_sq;
+  Eigen::Matrix3d omega_vee(Eigen::Matrix3d::Zero());
 
-  omega_vee(2, 1) = cur_state.omega(0);   //角速度的反对称矩阵
+  omega_vee(2, 1) = cur_state.omega(0);
   omega_vee(1, 2) = -cur_state.omega(0);
   omega_vee(0, 2) = cur_state.omega(1);
   omega_vee(2, 0) = -cur_state.omega(1);
   omega_vee(1, 0) = cur_state.omega(2);
   omega_vee(0, 1) = -cur_state.omega(2);
 
-  motor_rpm_sq = cur_state.motor_rpm.array().square();    //于存储电机转速的平方
+  motor_rpm_sq = cur_state.motor_rpm.array().square();
 
-  //! @todo implement
   Eigen::Array4d blade_linear_velocity;
   Eigen::Array4d motor_linear_velocity;
-  Eigen::Array4d AOA;   //攻角的计算
+  Eigen::Array4d AOA;
   blade_linear_velocity = 0.104719755 * cur_state.motor_rpm.array() * prop_radius_;
-  for (int i = 0; i < 4; ++i){
-    AOA[i]   = alpha0 - atan2(motor_linear_velocity[i], blade_linear_velocity[i]) * 180 / 3.14159265;
+  for (int i = 0; i < 4; ++i)
+  {
+    // 简单的攻角计算，此处可能存在未初始化 AOA 的问题，最好初始化
+    // AOA[i] = alpha0 - atan2(motor_linear_velocity[i], blade_linear_velocity[i]) * 180 / 3.14159265;
   }
 
+  // ============== 关键变量定义 (必须保留) ==============
+  double thrust = kf_ * motor_rpm_sq.sum();  // 总推力
 
-  // double totalF = kf_ * motor_rpm_sq.sum();
-  double thrust = kf_ * motor_rpm_sq.sum();  //总推力
-
-  Eigen::Vector3d moments;  //力矩
+  Eigen::Vector3d moments;
   moments(0) = kf_ * (motor_rpm_sq(2) - motor_rpm_sq(3)) * arm_length_;
   moments(1) = kf_ * (motor_rpm_sq(1) - motor_rpm_sq(0)) * arm_length_;
   moments(2) = km_ * (motor_rpm_sq(0) + motor_rpm_sq(1) - motor_rpm_sq(2) -
                       motor_rpm_sq(3));
 
-  double resistance = 0.1 *                                        // C
+  double resistance = 0.1 * // C
                       3.14159265 * (arm_length_) * (arm_length_) * // S
                       cur_state.v.norm() * cur_state.v.norm();
-
 
   vnorm = cur_state.v;
   if (vnorm.norm() != 0)
   {
     vnorm.normalize();
   }
+  // ====================================================
 
   x_dot = cur_state.v;
-  //请在这里补充完四旋翼飞机的动力学模型，提示：v_dot应该与重力，总推力，外力和空气阻力相关
-  // v_dot = //?????
 
+  // ==================== 补全部分开始 ====================
+  // 1. 线运动方程: m*a = G + R*T + F_drag + F_ext
+  Eigen::Vector3d gravity(0, 0, -g_);                // 重力向量 (世界系)
+  Eigen::Vector3d thrust_vec_body(0, 0, thrust);     // 推力向量 (机体系)
+  Eigen::Vector3d thrust_vec_world = R * thrust_vec_body; // 旋转到世界系
+  Eigen::Vector3d drag_force = -resistance * vnorm;  // 阻力 (与运动方向相反)
+
+  // 合力 = 重力 + 推力 + 阻力 + 外力
+  Eigen::Vector3d total_force = gravity + thrust_vec_world + drag_force + external_force_;
+  
+  // a = F / m
+  v_dot = total_force / mass_;
   acc_ = v_dot;
 
+  // 2. 姿态运动学
   R_dot = R * omega_vee;
-  //请在这里补充完四旋翼飞机的动力学模型，角速度导数的计算涉及到惯性矩阵J_的逆、力矩、科里奥利力（通过角速度与惯性矩阵和角速度的叉积来计算）和外部力矩等因素。
-  // omega_dot = //??????
+
+  // 3. 角运动方程: J*w_dot + w x (J*w) = Tau
+  // w_dot = J^(-1) * (Tau - w x (J*w))
+  Eigen::Vector3d total_torque = moments + external_moment_;
+  Eigen::Vector3d coriolis_term = cur_state.omega.cross(J_ * cur_state.omega); // 陀螺力矩项
+
+  omega_dot = J_.inverse() * (total_torque - coriolis_term);
+  // ==================== 补全部分结束 ====================
 
   motor_rpm_dot = (input_ - cur_state.motor_rpm) / motor_time_constant_;
 
@@ -226,7 +241,6 @@ void Quadrotor::operator()(const Quadrotor::InternalState& x,
     if (std::isnan(dxdt[i]))
     {
       dxdt[i] = 0;
-      //      std::cout << "nan apply to 0 for " << i << std::endl;
     }
   }
 }

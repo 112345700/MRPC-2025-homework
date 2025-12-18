@@ -84,7 +84,6 @@
     <remap from="~local_map"        to="/click_obstacle_generation/click_new_obs"/>
     <remap from="~odometry"         to="/visual_slam/odom"/>
 </node>
-
    <!-- Quadrotor Simulator -->
    <node pkg="so3_quadrotor_simulator" type="quadrotor_simulator_so3" name="quadrotor_simulator_so3" output="screen">
      <param name="rate/odom" value="100.0"/>
