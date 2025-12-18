@@ -3,9 +3,6 @@
 using namespace std;
 using namespace Eigen;
 
-// ======================= 参数区：你可以在这里调参 =======================
-
-// 软避障代价：看邻居周围半径（格）
 
 static const int    kInflateZLayers = 0;
 static const int    kObsCostRadius = 1;
@@ -163,8 +160,8 @@ bool Astarpath::verticalCorridorFree(const Eigen::Vector3i& xy_idx,
   return true;
 }
 
-// ------------------- 障碍设置（带膨胀）-------------------
-// 关键：固定高度规划下，障碍膨胀建议主要做 XY，Z 方向不要跟 r 一起膨胀，否则容易“封路”
+// ------------------- 障碍设置-------------------
+// 关键：固定高度规划下，障碍膨胀主要做 XY，Z 方向不要跟 r 一起膨胀
 void Astarpath::set_barrier(double x, double y, double z, int inflation_r) {
   if (x < gl_xl || y < gl_yl || z < gl_zl ||
       x >= gl_xu || y >= gl_yu || z >= gl_zu)
@@ -194,7 +191,7 @@ void Astarpath::set_barrier(double x, double y, double z, int inflation_r) {
       }
 }
 
-// ------------------- 防穿角（可关）-------------------
+// ------------------- 防穿角-------------------
 bool Astarpath::validMove(const Vector3i& from, const Vector3i& to) const {
   if (isOccupied(to)) return false;
   if (!kEnableCornerCuttingCheck) return true;
@@ -219,7 +216,7 @@ bool Astarpath::validMove(const Vector3i& from, const Vector3i& to) const {
   return true;
 }
 
-// ------------------- 取邻居：固定高度 2D A*（不允许主动上下飞）-------------------
+// ------------------- 取邻居：固定高度 2D A*-------------------
 void Astarpath::AstarGetSucc(MappingNodePtr currentPtr,
                              vector<MappingNodePtr> &neighborPtrSets,
                              vector<double> &edgeCostSets) {
@@ -251,13 +248,13 @@ void Astarpath::AstarGetSucc(MappingNodePtr currentPtr,
   }
 }
 
-// ------------------- 启发式（米）-------------------
+// ------------------- 启发式-------------------
 double Astarpath::getHeu(MappingNodePtr node1, MappingNodePtr node2) {
   Vector3d delta = node2->coord - node1->coord;
   return delta.norm() * kTieBreaker;
 }
 
-// ------------------- 软避障代价（有上界，不会封窄通道）-------------------
+// ------------------- 软避障代价-------------------
 // 思路：只看“最近障碍距离”，代价 ∈ [0, kObsCostWeight]
 double Astarpath::obstacleProximityCost(const Eigen::Vector3i& idx) const {
   const int z = idx(2);  // 固定高度层
